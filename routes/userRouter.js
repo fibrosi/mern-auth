@@ -6,16 +6,15 @@ const User = require("../models/userModel");
 
 router.post("/register", async (req, res) => {
     try {
-        const { email, password, passwordCheck, displayName } = req.body;
+        const { email, password, displayName } = req.body;
 
-        if (!email || !password || !passwordCheck)
+        if (!email || !password)
             return res.status(400).json({msg: "Not all fields have been entered."});
         if (password.length < 6)
             return res.status(400).json({msg: "Password too short!"});
-        if (password !== passwordCheck)
-            return res.status(400).json({msg: "Password twice input not correspond."});
+
+        const existingUser = await User.findOne({ email: email });
         
-            const existingUser = await User.findOne({ email: email });
         if (existingUser)
             return res.status(400).json({msg: "An account with this email already exists."});
         
@@ -29,8 +28,27 @@ router.post("/register", async (req, res) => {
         });
 
         const savedUser = await newUser.save();
-        res.json(savedUser);
+        res.json({id: savedUser._id, displayName: savedUser.displayName});
         
+    } catch (err) {
+        res.status(500).json({err: err.message});
+    }
+});
+
+router.get("/getuser", async (req, res) => {
+    try {
+        const email = req.header("email");
+        const displayName = req.header("displayName");
+
+        if (!email && !displayName) {
+            return res.status(400).json({msg: "Bad request"});
+        }
+
+        else {
+            const user = await User.findOne(email? {email: email}: {displayName: displayName});
+            return res.json(!user);
+        }
+
     } catch (err) {
         res.status(500).json({err: err.message});
     }
@@ -54,8 +72,7 @@ router.post("/login", async (req, res) => {
             token,
             user: {
                 id: user._id,
-                displayName: user.displayName,
-                email: user.email
+                displayName: user.displayName
             }
         });
     } catch (err) {
@@ -84,10 +101,19 @@ router.post("/tokenIsValid", async (req, res) => {
 
         const user = await User.findById(verified.id);
         if (!user) return res.json(false);
+        return res.json(true);
         
     } catch (err) {
         return res.status(500).json({err: err.message});
     }
+});
+
+router.get("/", auth, async (req, res) => {
+    const user = await User.findById(req.user);
+    res.json({
+        id: user._id,
+        displayName: user.displayName
+    });
 });
 
 module.exports = router;
